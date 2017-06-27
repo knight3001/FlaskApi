@@ -1,0 +1,7 @@
+{
+    "python.pythonPath": "${env.PYTHONPATH}python.exe",
+    "python.autoComplete.extraPaths": [
+        "${env.PYTHONPATH}/Lib/site-packages/site-packages"
+    ],
+    "files.autoSave": "afterDelay"
+}
