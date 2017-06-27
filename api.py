@@ -6,7 +6,7 @@ from flask import Flask, jsonify, request
 from flask_restful import Api, Resource, abort, reqparse
 from flask_cors import CORS, cross_origin
 
-from general import insert_db, query_db
+from database import insert_db, query_db
 
 MAPURL = "https://maps.googleapis.com/maps/api/geocode/json?"
 APIKEY = 'AIzaSyDdtB13gdB0BmgUvvbRe8K4_gv8n3g56aw'
@@ -36,7 +36,7 @@ class Job(Resource):
         ]
         """
         if not request.json:
-            return {'error': 'not json request'}, 400
+            return {'error': 'not a json request'}, 400
         try:
             json_data = request.get_json(force=True)
             s = ""
@@ -53,15 +53,15 @@ class Job(Resource):
 
     def get(self, jobid):
         """
-        /job/3
+        /job/1
         """
         if not jobid.isdigit():
-            return {'error': 'ID shoule be a number'}, 400
+            return {'error': 'jobid shoule be a number'}, 400
 
         job = query_db(
             'select * from [jobs] where job_id = ?', [jobid], one=True)
         if job is None:
-            return {'error': 'ID not matched'}, 400
+            return {'error': 'jobid not matched'}, 400
 
         if job["complete_date"]:
             result = []
@@ -80,16 +80,16 @@ class Job(Resource):
 class Queue(Resource):
     def get(self, jobid):
         """
-        /queue/3
+        /queue/1
         """
         if not jobid.isdigit():
-            return {'error': 'ID shoule be a number'}, 400
+            return {'error': 'jobid shoule be a number'}, 400
         job = query_db(
             'select * from [jobs] where job_id = ?', [jobid], one=True)
         if job is None:
-            return {'error': 'ID not matched'}, 400
+            return {'error': 'jobid not matched'}, 400
         if job["complete_date"]:
-            return {'error': 'Job has completed before'}, 400
+            return {'error': 'job has completed before'}, 400
 
         detail = job['detail']
         for loc in detail.split("||"):
@@ -98,17 +98,22 @@ class Queue(Resource):
                 location = query_db('select * from [locations] where name = ? and address = ?',
                                     [locList[0], locList[1]], one=True)
                 if location is None:
-                    mapurl = MAPURL + "address=" + \
+                    url = MAPURL + "address=" + \
                         locList[1].replace(" ", "%") + "&key=" + APIKEY
-                    response = requests.get(mapurl)
+                    response = requests.get(url)
                     data = response.json()
                     if data['status'] == 'OK':
                         geo = data['results'][0]['geometry']['location']
                         locationid = insert_db("insert into [locations]" +
                                                "(name,address,latitude,longitude) values(?,?,?,?)",
                                                [locList[0], locList[1], geo['lat'], geo['lng']])
-                        insert_db("insert into [job_location](job_id, location_id) values(?, ?)",
-                                  [jobid, locationid])
+                    else:
+                        locationid = insert_db("insert into [locations]" +
+                                               "(name,address,latitude,longitude) values(?,?,?,?)",
+                                               [locList[0], locList[1], 0, 0])
+
+                    insert_db("insert into [job_location](job_id, location_id) values(?, ?)",
+                              [jobid, locationid])
                 else:
                     insert_db("insert into [job_location](job_id, location_id) values(?, ?)",
                               [jobid, location['location_id']])
