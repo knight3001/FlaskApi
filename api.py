@@ -88,15 +88,16 @@ class Queue(Resource):
             'select * from [jobs] where job_id = ?', [jobid], one=True)
         if job is None:
             return {'error': 'jobid not matched'}, 400
+
         if job["complete_date"]:
-            return {'error': 'job has completed before'}, 400
+            return {"jobid": jobid, "link": "/job/" + str(jobid)}, 200
 
         detail = job['detail']
         for loc in detail.split("||"):
             if loc:
                 locList = loc.split("--")
                 location = query_db('select * from [locations] where name = ? and address = ?',
-                                    [locList[0], locList[1]], one=True)
+                                    [locList[0].strip(), locList[1].strip()], one=True)
                 if location is None:
                     url = MAPURL + "address=" + \
                         locList[1].replace(" ", "%") + "&key=" + APIKEY
@@ -106,11 +107,12 @@ class Queue(Resource):
                         geo = data['results'][0]['geometry']['location']
                         locationid = insert_db("insert into [locations]" +
                                                "(name,address,latitude,longitude) values(?,?,?,?)",
-                                               [locList[0], locList[1], geo['lat'], geo['lng']])
+                                               [locList[0].strip(), locList[1].strip(),
+                                                geo['lat'], geo['lng']])
                     else:
                         locationid = insert_db("insert into [locations]" +
                                                "(name,address,latitude,longitude) values(?,?,?,?)",
-                                               [locList[0], locList[1], 0, 0])
+                                               [locList[0].strip(), locList[1].strip(), 0, 0])
 
                     insert_db("insert into [job_location](job_id, location_id) values(?, ?)",
                               [jobid, locationid])
